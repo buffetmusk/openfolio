@@ -1,6 +1,13 @@
 /* global React */
 const { useState, useEffect, useRef, useCallback } = React;
 
+/* ── Haptic helper — uses window.haptic (ios-haptics) loaded as ESM module ── */
+const hap = {
+  tap: () => { try { window.haptic?.();          } catch {} },
+  ok:  () => { try { window.haptic?.confirm();   } catch {} },
+  err: () => { try { window.haptic?.error();     } catch {} },
+};
+
 /* ====== ICONS ====== */
 const Icon = {
   home: (s='currentColor') => (
@@ -224,7 +231,7 @@ const Tabs = ({ items, active, onChange }) => {
       {items.map((it, i) => (
         <button key={it} ref={el => refs.current[i] = el}
           className={`tab ${i===active?'active':''}`}
-          onClick={() => onChange(i)}>{it}</button>
+          onClick={() => { hap.tap(); onChange(i); }}>{it}</button>
       ))}
       <div className="tab-underline" style={{left:u.left, width:u.width}}></div>
     </div>
@@ -233,12 +240,12 @@ const Tabs = ({ items, active, onChange }) => {
 
 /* ====== SIGNAL BANNER ====== */
 const SignalBanner = ({ onTap, onClose }) => (
-  <div className="signal" onClick={onTap}>
+  <div className="signal" onClick={() => { hap.tap(); onTap(); }}>
     <div>
       <div className="signal-eyebrow">Weekly Signal</div>
       <div className="signal-text">2 veteran traders added <span className="mono">BAJFINANCE</span></div>
     </div>
-    <button className="signal-close" onClick={(e)=>{e.stopPropagation(); onClose();}} aria-label="Dismiss">×</button>
+    <button className="signal-close" onClick={(e)=>{e.stopPropagation(); hap.tap(); onClose();}} aria-label="Dismiss">×</button>
   </div>
 );
 
@@ -253,8 +260,11 @@ const TraderCard = ({ t, idx, onFollow, onUnlock, period }) => {
 
   const handleFollow = () => {
     if (!t.following) {
+      hap.ok();
       setPopping(true);
       setTimeout(() => setPopping(false), 400);
+    } else {
+      hap.tap();
     }
     onFollow(t.id);
   };
@@ -262,6 +272,7 @@ const TraderCard = ({ t, idx, onFollow, onUnlock, period }) => {
   return (
     <div className={`tcard ${open?'expanded':''}`} style={{animationDelay: `${idx*40}ms`}} onClick={(e)=>{
       if (e.target.closest('button')) return;
+      hap.tap();
       setOpen(o=>!o);
     }}>
       <div className="tcard-head">
@@ -460,7 +471,7 @@ const SurgeScreen = ({ screenClass, toast }) => {
               <div className="stock-adds"><span className={`adds-cnt ${s.trend}`}>{s.trend==='up'?'+':'-'}{s.added}</span><span className="adds-lbl">added today</span></div>
               <div className="progress"><div className="progress-fill" style={{width:`${s.strength}%`}}></div></div>
             </div>
-            <button className={`bell ${s.bell?'on':''} ${ringing===i?'ringing':''}`} onClick={()=>toggleBell(i)}>
+            <button className={`bell ${s.bell?'on':''} ${ringing===i?'ringing':''}`} onClick={()=>{ hap.tap(); toggleBell(i); }}>
               {Icon.bell()}
             </button>
           </div>
@@ -572,7 +583,7 @@ const PortfolioChart = ({ visible }) => {
       </div>
       <div className="chart-periods chart-periods-tabs">
         {CHART_PERIODS.map(p => (
-          <button key={p} className={`pp ${period===p?'on':''}`} onClick={()=>setPeriod(p)}>{p}</button>
+          <button key={p} className={`pp ${period===p?'on':''}`} onClick={()=>{ hap.tap(); setPeriod(p); }}>{p}</button>
         ))}
       </div>
     </div>
@@ -868,8 +879,10 @@ const UnlockModal = ({ open, trader, onClose, toast, onSubscribe, subscribed }) 
   const [stage, setStage] = useState('preview'); // preview | pay | success
   useEffect(() => { if (open) setStage('preview'); }, [open]);
   const pay = () => {
+    hap.tap();
     setStage('pay');
     setTimeout(() => {
+      hap.ok();
       setStage('success');
       onSubscribe();
       setTimeout(() => { onClose(); }, 1400);
@@ -1149,12 +1162,16 @@ const Onboarding = ({ onDone }) => {
   const [selBroker, setSelBroker] = useState(0);
 
   const reroll = () => {
+    hap.tap();
     let n = pseudo;
     while (n === pseudo) n = PSEUDO_POOL[Math.floor(Math.random()*PSEUDO_POOL.length)];
     setPseudo(n);
   };
-  const next = () => { setDir('go-forward'); step < 3 ? setStep(step+1) : onDone(); };
-  const back = () => { setDir('go-back'); setStep(step-1); };
+  const next = () => {
+    setDir('go-forward');
+    if (step < 3) { hap.tap(); setStep(step+1); } else { hap.ok(); onDone(); }
+  };
+  const back = () => { hap.tap(); setDir('go-back'); setStep(step-1); };;
 
   const STEPS = [
     {
@@ -1180,7 +1197,7 @@ const Onboarding = ({ onDone }) => {
       extra: (
         <div className="ob2-brokers">
           {[{n:'Zerodha',t:'#387ED1'},{n:'Groww',t:'#00B386'},{n:'Upstox',t:'#702EFF'},{n:'Angel One',t:'#E63946'}].map((b,i)=>(
-            <button key={b.n} className={`ob2-broker ${selBroker===i?'on':''}`} onClick={()=>setSelBroker(i)}>
+            <button key={b.n} className={`ob2-broker ${selBroker===i?'on':''}`} onClick={()=>{ hap.tap(); setSelBroker(i); }}>
               <span className="ob2-broker-dot" style={{background:b.t}}>{b.n[0]}</span>
               <span>{b.n}</span>
               {selBroker===i && <span className="ob2-broker-check">✓</span>}
@@ -1198,7 +1215,7 @@ const Onboarding = ({ onDone }) => {
       <StatusBar />
       <div className="ob2-top">
         <span className="ob2-count">{step+1}<span style={{opacity:.3}}> / 4</span></span>
-        {step < 3 && <button className="ob2-skip" onClick={onDone}>Skip</button>}
+        {step < 3 && <button className="ob2-skip" onClick={() => { hap.tap(); onDone(); }}>Skip</button>}
       </div>
 
       <div className="ob2-illus">
@@ -1251,6 +1268,7 @@ const App = () => {
   };
 
   const navigate = (next) => {
+    hap.tap();
     setPrevScreen(screen);
     setScreen(next);
   };
