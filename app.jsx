@@ -334,7 +334,7 @@ const TraderCard = ({ t, idx, onFollow, onUnlock, period }) => {
             ))}
           </div>
           <div className="tcard-foot">
-            {t.live && !t.unlocked && <button className="see-live" onClick={()=>onUnlock(t)}><span className="lv-dot"></span>See Live</button>}
+            {t.live && <button className="see-live" onClick={()=>onUnlock(t)}><span className="lv-dot"></span>See Live</button>}
             <div style={{marginLeft:'auto'}}>
               {!t.unlocked
                 ? <button className="btn-unlock" onClick={() => onUnlock(t)}><span className="dia">◈</span> 10 Unlock</button>
@@ -885,7 +885,7 @@ const UnlockModal = ({ open, trader, onClose, toast, onSubscribe, subscribed }) 
       hap.ok();
       setStage('success');
       onSubscribe();
-      setTimeout(() => { onClose(); }, 1400);
+      setTimeout(() => { setStage('preview'); }, 1600);
     }, 1100);
   };
   return (
@@ -910,7 +910,7 @@ const UnlockModal = ({ open, trader, onClose, toast, onSubscribe, subscribed }) 
             ))}
           </div>
           <div className="sheet-section-label">If You Had Followed</div>
-          <div className="sim-mini">
+          <div className={`sim-mini ${subscribed?'unlocked':''}`}>
             <div className="stats">
               <div><div className="l">Their return</div><div className="v up">+38.2%</div></div>
               <div><div className="l">Nifty</div><div className="v">+8.1%</div></div>

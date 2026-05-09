@@ -1103,7 +1103,9 @@ body{
   font-weight:700;
   font-size:20px;
   filter:blur(7px);
+  transition:filter 400ms ease;
 }
+.sim-mini.unlocked .stats .v{filter:none;}
 .sim-mini .stats .l{
   font-size:9px;
   letter-spacing:1.4px;
