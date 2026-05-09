@@ -43,10 +43,10 @@ const Icon = {
 };
 
 /* ====== STATUS BAR ====== */
-const StatusBar = () => (
+const StatusBar = ({ dark=false }) => (
   <>
     <div className="notch"></div>
-    <div className="statusbar">
+    <div className={`statusbar${dark?' statusbar-dark':''}`}>
       <span>9:41</span>
       <span className="right" style={{display:'flex',gap:5,alignItems:'center'}}>
         <svg width="16" height="11" viewBox="0 0 16 11" fill="none">
@@ -349,26 +349,32 @@ const TraderCard = ({ t, idx, onFollow, onUnlock, period }) => {
 };
 
 /* ====== DISCOVER ====== */
+const MY_CAPITAL = 24000000; // ₹2.4Cr — user's own portfolio tier
+
 const TRADERS_INIT = [
   {id:1, name:'Iron Crane', handle:'IronCrane_v', slug:'cantoned-cookiecutter', live:true,
+   portfolioValue:60500000, heroColor:'#0d1117',
    badges:'14 yrs in markets · Seen a 100x · 22 trades/mo', followers:1564,
    verified:554, accuracy:68, tradingDays:60, window:180, capital:'₹6.05Cr',
    tickers:[{tk:'RELIANCE',count:42,flow:147},{tk:'INFY',count:18,flow:31},{tk:'HDFC',count:31,flow:18}], hidden:2,
    pnls:{swing:{val:'+₹2.4L',pct:'+8.2%',up:true}, btst:{val:'+₹14,200',pct:'+1.1%',up:true}, short:{val:'+₹29.22L',pct:'+17%',up:true}, long:{val:'+₹10.95Cr',pct:'+24%',up:true}},
    unlocked:false, following:false},
   {id:2, name:'Silent Bull', handle:'silent_bull', slug:'looking-kelpie', live:false,
+   portfolioValue:24000000, heroColor:'#0a1a0d',
    badges:'Never panic-sold · 3 multibagger exits', followers:48,
    verified:360, accuracy:81, tradingDays:88, window:180, capital:'₹2.4Cr',
    tickers:[{tk:'TATAMOTORS',count:27,flow:82},{tk:'ZOMATO',count:14,flow:64},{tk:'WIPRO',count:9,flow:12},{tk:'BAJFINANCE',count:36,flow:98}], hidden:0,
    pnls:{swing:{val:'+₹1.8L',pct:'+6.4%',up:true}, btst:{val:'+₹8,400',pct:'+0.6%',up:true}, short:{val:'+₹78,400',pct:'+3.1%',up:true}, long:{val:'+₹4.2Cr',pct:'+28.4%',up:true}},
    unlocked:true, following:true},
   {id:3, name:'Monsoon Fox', handle:'monsoon.fx', slug:'parqueted-passerine', live:true,
+   portfolioValue:182000000, heroColor:'#080d22',
    badges:'19 yrs · Seen 10x & 100x · Never panic-sold', followers:6364,
    verified:524, accuracy:74, tradingDays:142, window:180, capital:'₹18.2Cr',
    tickers:[{tk:'HDFCBANK',count:54,flow:24},{tk:'BAJFINANCE',count:36,flow:98}], hidden:3,
    pnls:{swing:{val:'+₹4.6L',pct:'+12.1%',up:true}, btst:{val:'+₹22,400',pct:'+1.4%',up:true}, short:{val:'+₹1.4L',pct:'+0.8%',up:true}, long:{val:'+₹22.8Cr',pct:'+41.2%',up:true}},
    unlocked:false, following:false},
   {id:4, name:'Velvet Bear', handle:'velvet_bear', slug:'fangled-swan', live:false,
+   portfolioValue:8400000, heroColor:'#1a0a0d',
    badges:'8 yrs · 18 trades/mo · Swing specialist', followers:266,
    verified:220, accuracy:52, tradingDays:74, window:180, capital:'₹84L',
    tickers:[{tk:'ADANIENT',count:22,flow:8},{tk:'NIFTY50',count:88,flow:42}], hidden:2,
@@ -376,32 +382,144 @@ const TRADERS_INIT = [
    unlocked:false, following:false},
 ];
 
-const DiscoverScreen = ({ screenClass, onUnlock, traders, setTraders, toast }) => {
-  const [tab, setTab] = useState(0);
-  const [period, setPeriod] = useState('all');
+/* ── Autopilot-style list row ── */
+const TraderRow = ({ t, onSelect, subscribed }) => {
+  const canSee = t.portfolioValue <= MY_CAPITAL || subscribed || t.unlocked;
+  const pnl = t.pnls.long;
+  return (
+    <div className="trow" onClick={() => { hap.tap(); onSelect(t); }}>
+      <div className={`trow-av${!canSee ? ' locked' : ''}`}>
+        {initials(t.name)}
+        {t.live && <span className="trow-live-dot"/>}
+      </div>
+      <div className="trow-mid">
+        <div className="trow-name">
+          {t.name}
+          {t.following && <span className="trow-badge">✓</span>}
+        </div>
+        <div className="trow-sub">{t.badges.split('·')[0].trim()}</div>
+      </div>
+      <div className="trow-rt">
+        <span className={`trow-pct${canSee ? (pnl.up?' up':' dn') : ' muted'}`}>
+          {canSee ? pnl.pct : '••.•%'}
+        </span>
+        {!canSee && <span className="trow-lock">⟠</span>}
+        <span className="trow-chev">›</span>
+      </div>
+    </div>
+  );
+};
+
+/* ── Autopilot-style push-nav detail screen ── */
+const TraderDetailScreen = ({ trader, show, onBack, subscribed, onFollow, onSubscribeClick }) => {
+  const canSee = trader ? (trader.portfolioValue <= MY_CAPITAL || subscribed || trader.unlocked) : false;
+  const pnl = trader?.pnls?.long;
+  const DEMO_HOLDINGS = [
+    ['RELIANCE','₹1,42,318','31%'],['INFY','₹88,402','19%'],
+    ['HDFCBANK','₹62,950','14%'],['BAJFINANCE','₹39,210','9%'],
+  ];
+  return (
+    <div className={`detail-scr${show ? ' show' : ''}`}>
+      {trader && <>
+        {/* Dark hero */}
+        <div className="detail-hero" style={{background: trader.heroColor || '#111'}}>
+          <StatusBar dark />
+          <button className="detail-back" onClick={() => { hap.tap(); onBack(); }}>
+            <svg width="9" height="16" viewBox="0 0 9 16" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 1L1 8l7 7"/>
+            </svg>
+          </button>
+          <div className="detail-hero-body">
+            <div className={`detail-av${!canSee ? ' locked' : ''}`}>
+              {initials(trader.name)}
+              {trader.live && <span className="detail-lv-dot"/>}
+            </div>
+            <h1 className="detail-name">{trader.name}</h1>
+            <div className="detail-handle">@{trader.handle}</div>
+            {canSee
+              ? <div className={`detail-return${pnl?.up ? ' up' : ' dn'}`}>
+                  {pnl?.val} <span className="detail-return-pct">{pnl?.pct}</span>
+                </div>
+              : <div className="detail-pro-tag">PRO · Subscribe to unlock</div>
+            }
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="detail-body">
+          <div className="detail-stats-grid">
+            <div className="dsg-cell"><div className="dsg-l">Verified</div><div className="dsg-v"><span className="tick">✓</span>{trader.verified}<span className="dsg-u">d</span></div></div>
+            <div className="dsg-cell"><div className="dsg-l">Accuracy</div><div className="dsg-v">{trader.accuracy}<span className="dsg-u">%</span></div></div>
+            <div className="dsg-cell"><div className="dsg-l">Trading days</div><div className="dsg-v">{trader.tradingDays}<span className="dsg-u">/{trader.window}</span></div></div>
+            <div className="dsg-cell"><div className="dsg-l">Capital</div><div className="dsg-v">{canSee ? trader.capital : <span className="score-blur">₹0.0Cr</span>}</div></div>
+          </div>
+
+          <div className="detail-sec-hd">Current Holdings</div>
+          <div className="detail-holdings">
+            {DEMO_HOLDINGS.map(([tk,v,pct]) => (
+              <div className="dh-row" key={tk}>
+                <div className="dh-tk">{canSee ? tk : <span className="score-blur">{tk}</span>}</div>
+                <div className="dh-pct">{canSee ? pct : '•%'}</div>
+                <div className="dh-val">{canSee ? v : <span className="score-blur">{v}</span>}</div>
+              </div>
+            ))}
+            {trader.hidden > 0 && <div className="dh-more">+{trader.hidden} more · {canSee ? 'tap to view' : 'unlock to see all'}</div>}
+          </div>
+
+          <div className="detail-sec-hd">If you had followed</div>
+          <div className="detail-compare">
+            {[['Their return', '+38.2%', true],['Nifty 50', '+8.1%', false],['Alpha', '+30.1%', true]].map(([l,v,isUp]) => (
+              <div className="dc-col" key={l}>
+                <div className="dc-lbl">{l}</div>
+                <div className={`dc-val${canSee && isUp ? ' up' : ''}`}>
+                  {canSee ? v : <span className="score-blur">{v}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="detail-about">{trader.badges}</div>
+          <div style={{height:90}}/>
+        </div>
+
+        {/* Fixed CTA */}
+        <div className="detail-footer">
+          {!canSee
+            ? <button className="detail-cta-sub" onClick={() => { hap.tap(); onSubscribeClick(); }}>
+                Subscribe ₹499/mo to unlock →
+              </button>
+            : trader.following
+              ? <button className="detail-cta detail-cta-following" onClick={() => { hap.ok(); onFollow(trader.id); }}>
+                  ✓ Following {trader.name.split(' ')[0]}
+                </button>
+              : <button className="detail-cta" onClick={() => { hap.ok(); onFollow(trader.id); }}>
+                  Follow {trader.name.split(' ')[0]}
+                </button>
+          }
+        </div>
+      </>}
+    </div>
+  );
+};
+
+const DiscoverScreen = ({ screenClass, traders, subscribed, onSelectTrader, toast }) => {
   const [signalDismissed, setSignalDismissed] = useState(() => { try { return localStorage.getItem('of_signal_dismissed') === '1'; } catch(e) { return false; } });
-  const onFollow = (id) => {
-    setTraders(prev => prev.map(t => t.id===id ? {...t, following:!t.following} : t));
-    const t = traders.find(x => x.id===id);
-    if (t && !t.following) toast(`Following ${t.name}`);
-  };
   const liveCount = traders.filter(t => t.live).length;
+  const free = traders.filter(t => t.portfolioValue <= MY_CAPITAL);
+  const premium = traders.filter(t => t.portfolioValue > MY_CAPITAL);
   return (
     <div className={screenClass}>
       <StatusBar />
       <TopBar isLogo />
       <div className="screen-body">
         <div className="section-row">
-          <span className="eyebrow">Home</span>
-          <span className="meta"><span className="lv-dot"></span> {liveCount * 1428} live now</span>
+          <span className="eyebrow">Traders</span>
+          <span className="meta"><span className="lv-dot"></span>{liveCount * 1428} live now</span>
         </div>
-        <div className="period-tabs-row">
-          <Tabs items={['All','Swing','BTST','Short','Long']} active={['all','swing','btst','short','long'].indexOf(period)} onChange={(i)=>setPeriod(['all','swing','btst','short','long'][i])} />
-          <button className="filter-btn icon-only" onClick={()=>toast('Filters')} aria-label="Filters">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
-          </button>
-        </div>
-        {!signalDismissed && <SignalBanner onTap={() => { setSignalDismissed(true); try{localStorage.setItem('of_signal_dismissed','1');}catch(e){} toast('Opened'); }} onClose={() => { setSignalDismissed(true); try{localStorage.setItem('of_signal_dismissed','1');}catch(e){} }} />}
+        {!signalDismissed && <SignalBanner
+          onTap={() => { hap.tap(); setSignalDismissed(true); try{localStorage.setItem('of_signal_dismissed','1');}catch(e){} toast('Opened'); }}
+          onClose={() => { setSignalDismissed(true); try{localStorage.setItem('of_signal_dismissed','1');}catch(e){} }}
+        />}
         <div className="flow-strip">
           <span className="flow-strip-l">Today's flow</span>
           {[['RELIANCE',147],['BAJFINANCE',98],['TATAMOTORS',82],['ZOMATO',64],['INFY',-31],['HDFCBANK',24]].map(([tk,n],i)=>(
@@ -412,10 +530,15 @@ const DiscoverScreen = ({ screenClass, onUnlock, traders, setTraders, toast }) =
             </span>
           ))}
         </div>
-        <div className="cards-list">
-          {traders.map((t,i) => (
-            <TraderCard key={t.id} t={t} idx={i} period={period} onFollow={onFollow} onUnlock={onUnlock} />
+        <div className="trow-list">
+          {!subscribed && <div className="tier-hd"><span>In your league</span><span className="tier-ct">{free.length} traders</span></div>}
+          {(subscribed ? traders : free).map(t => (
+            <TraderRow key={t.id} t={t} onSelect={onSelectTrader} subscribed={subscribed} />
           ))}
+          {!subscribed && premium.length > 0 && <>
+            <div className="tier-hd tier-hd-locked"><span>Above your tier</span><span className="tier-ct">PRO · {premium.length} locked ⟠</span></div>
+            {premium.map(t => <TraderRow key={t.id} t={t} onSelect={onSelectTrader} subscribed={false} />)}
+          </>}
         </div>
       </div>
     </div>
@@ -1255,6 +1378,8 @@ const App = () => {
   const [subscribed, setSubscribed] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
   const toastTimer = useRef(null);
+  const [detailTrader, setDetailTrader] = useState(null);
+  const [showDetail, setShowDetail] = useState(false);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -1265,6 +1390,20 @@ const App = () => {
   const openUnlock = (t) => {
     setModalTrader(t);
     setModalOpen(true);
+  };
+
+  const openDetail = (t) => {
+    setDetailTrader(t);
+    requestAnimationFrame(() => setShowDetail(true));
+  };
+  const closeDetail = () => {
+    setShowDetail(false);
+    setTimeout(() => setDetailTrader(null), 400);
+  };
+  const followTrader = (id) => {
+    setTraders(prev => prev.map(t => t.id===id ? {...t, following:!t.following} : t));
+    const t = traders.find(x => x.id===id);
+    if (t && !t.following) showToast(`Following ${t.name}`);
   };
 
   const navigate = (next) => {
@@ -1282,16 +1421,19 @@ const App = () => {
     return 'screen';
   };
 
+  const detailTraderLive = detailTrader ? traders.find(t => t.id === detailTrader.id) : null;
+
   return (
     <div className="device">
       {!onboarded && <Onboarding onDone={finishOnboarding} />}
       {onboarded && <>
-      <DiscoverScreen screenClass={screenClass(0)} traders={traders} setTraders={setTraders} onUnlock={openUnlock} toast={showToast} />
+      <DiscoverScreen screenClass={screenClass(0)} traders={traders} subscribed={subscribed} onSelectTrader={openDetail} toast={showToast} />
       <SurgeScreen screenClass={screenClass(1)} toast={showToast} />
       <PortfolioScreen screenClass={screenClass(2)} onUnlockPeer={()=>openUnlock(null)} toast={showToast} subscribed={subscribed} />
       <IntelligenceScreen screenClass={screenClass(3)} onUnlock={()=>openUnlock(null)} toast={showToast} subscribed={subscribed} />
       <BottomNav active={screen} onChange={navigate} />
       <UnlockModal open={modalOpen} trader={modalTrader} onClose={()=>setModalOpen(false)} toast={showToast} onSubscribe={()=>setSubscribed(true)} subscribed={subscribed} />
+      <TraderDetailScreen trader={detailTraderLive} show={showDetail} onBack={closeDetail} subscribed={subscribed} onFollow={followTrader} onSubscribeClick={() => { setModalTrader(detailTraderLive); setModalOpen(true); }} />
       <div className={`toast ${toastMsg?'show':''}`}>{toastMsg || ''}</div>
       </>}
     </div>
