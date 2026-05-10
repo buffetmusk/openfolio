@@ -351,6 +351,25 @@ const TraderCard = ({ t, idx, onFollow, onUnlock, period }) => {
 /* ====== DISCOVER ====== */
 const MY_CAPITAL = 24000000; // ₹2.4Cr — user's own portfolio tier
 
+/* demo 12-month sparkline data per trader */
+const TRADER_CHARTS = {
+  1: [38,40,42,39,44,48,46,52,55,50,58,62,58,65,70,67,74,72,78,82],
+  2: [44,48,46,52,56,53,60,64,62,68,72,68,75,80,78,84,88,86,90,96],
+  3: [36,40,38,46,52,48,58,66,62,70,78,72,84,92,88,98,106,102,112,120],
+  4: [58,54,56,50,46,48,44,40,42,38,35,38,34,30,32,28,25,28,22,18],
+};
+
+const POSITION_PCT = {
+  '1_RELIANCE':'+28.4%','1_INFY':'+11.2%','1_HDFC':'+8.6%','1_HDFCBANK':'+9.1%',
+  '2_TATAMOTORS':'+34.1%','2_ZOMATO':'+18.9%','2_WIPRO':'-4.2%','2_BAJFINANCE':'+42.8%',
+  '3_HDFCBANK':'+19.6%','3_BAJFINANCE':'+38.2%',
+  '4_ADANIENT':'-8.1%','4_NIFTY50':'-2.8%',
+};
+
+const getStockHolders = (ticker, traders) =>
+  traders.filter(t => t.tickers.some(tk => tk.tk === ticker))
+         .map(t => ({ ...t, tkData: t.tickers.find(x => x.tk === ticker) }));
+
 const TRADERS_INIT = [
   {id:1, name:'Iron Crane', handle:'IronCrane_v', slug:'cantoned-cookiecutter', live:true,
    portfolioValue:60500000, heroColor:'#0d1117',
@@ -382,6 +401,125 @@ const TRADERS_INIT = [
    unlocked:false, following:false},
 ];
 
+/* ── Sparkline chart for trader portfolio ── */
+const MiniChart = ({ data, up }) => {
+  const W = 320, H = 80, P = 4;
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => [
+    P + (i/(data.length-1)) * (W - P*2),
+    P + (1 - (v-min)/range) * (H - P*2)
+  ]);
+  const linePath = pts.map((p,i) => (i===0?'M':'L') + p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const fillPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)} ${H} L${pts[0][0].toFixed(1)} ${H} Z`;
+  const lineColor = up ? '#4ade80' : '#f87171';
+  const fillColor = up ? 'rgba(74,222,128,0.18)' : 'rgba(248,113,113,0.18)';
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{width:'100%',height:80,display:'block'}}>
+      <path d={fillPath} fill={fillColor}/>
+      <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+};
+
+/* ── TradingView embedded chart ── */
+const TVChart = ({ ticker }) => {
+  const ref = useRef(null);
+  const tvSym = ticker === 'NIFTY50' ? 'NSE:NIFTY' : `NSE:${ticker}`;
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'tradingview-widget-container';
+    wrap.style.cssText = 'height:100%;width:100%;';
+    const inner = document.createElement('div');
+    inner.className = 'tradingview-widget-container__widget';
+    inner.style.cssText = 'height:calc(100% - 32px);width:100%;';
+    const sc = document.createElement('script');
+    sc.type = 'text/javascript';
+    sc.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+    sc.async = true;
+    sc.innerHTML = JSON.stringify({
+      symbol: tvSym, width: '100%', height: '100%', locale: 'en',
+      dateRange: '12M', colorTheme: 'light', isTransparent: false, autosize: true,
+    });
+    wrap.appendChild(inner);
+    wrap.appendChild(sc);
+    ref.current.appendChild(wrap);
+    return () => { try { if (ref.current) ref.current.innerHTML = ''; } catch {} };
+  }, [tvSym]);
+  return <div ref={ref} style={{width:'100%',height:260,overflow:'hidden'}}/>;
+};
+
+/* ── Stock detail push-nav screen ── */
+const StockDetailScreen = ({ ticker, traders, show, onBack, subscribed }) => {
+  const holders = ticker ? getStockHolders(ticker, traders) : [];
+  return (
+    <div className={`detail-scr${show ? ' show' : ''}`} style={{zIndex:35}}>
+      {ticker && <>
+        <div style={{background:'#0d0d0d',flexShrink:0}}>
+          <StatusBar dark/>
+          <button className="detail-back" onClick={() => { hap.tap(); onBack(); }}>
+            <svg width="9" height="16" viewBox="0 0 9 16" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 1L1 8l7 7"/>
+            </svg>
+          </button>
+          <div style={{padding:'54px 24px 18px',color:'white'}}>
+            <div style={{fontFamily:'var(--mono)',fontSize:10,letterSpacing:'1.6px',textTransform:'uppercase',color:'rgba(255,255,255,0.4)',marginBottom:4}}>NSE · EQUITY</div>
+            <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:28,letterSpacing:'-0.5px'}}>{ticker}</div>
+          </div>
+        </div>
+        <div className="tv-chart-wrap">
+          <TVChart ticker={ticker}/>
+        </div>
+        <div style={{flex:1,overflowY:'auto',scrollbarWidth:'none',paddingBottom:32}}>
+          <div className="detail-sec-hd" style={{paddingTop:20}}>
+            Positions · {holders.length} trader{holders.length!==1?'s':''}
+          </div>
+          <div className="detail-holdings">
+            {holders.length === 0 && (
+              <div className="dh-row">
+                <div className="dh-tk" style={{color:'var(--g1)',fontStyle:'italic'}}>No tracked traders hold this stock</div>
+              </div>
+            )}
+            {holders.map(h => {
+              const canSeeHolder = h.portfolioValue <= MY_CAPITAL || subscribed || h.unlocked;
+              const pctKey = `${h.id}_${ticker}`;
+              const pct = POSITION_PCT[pctKey] || (h.pnls.long.up ? '+' : '') + h.pnls.long.pct;
+              const isUp = pct.startsWith('+');
+              return (
+                <div className="stock-trader-row" key={h.id}>
+                  <div className={`trow-av${!canSeeHolder?' locked':''}`} style={{width:38,height:38,fontSize:11,flexShrink:0}}>
+                    {initials(h.name)}
+                    {h.live && <span className="trow-live-dot"/>}
+                  </div>
+                  <div className="trow-mid">
+                    <div className="trow-name" style={{fontSize:13}}>
+                      {canSeeHolder ? h.name : <span className="score-blur">{h.name}</span>}
+                      {h.following && <span className="trow-badge">✓</span>}
+                    </div>
+                    <div className="trow-sub">
+                      {canSeeHolder
+                        ? `${h.tkData?.count||'?'} trades · ${h.tkData?.flow?(h.tkData.flow>0?'+':'')+h.tkData.flow+'↑ flow':'accumulating'}`
+                        : 'PRO · Subscribe to unlock'}
+                    </div>
+                  </div>
+                  <div className="trow-rt">
+                    {canSeeHolder
+                      ? <span className={`trow-pct${isUp?' up':' dn'}`}>{pct}</span>
+                      : <span className="trow-lock">⟠</span>}
+                    <span className="trow-chev">›</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </>}
+    </div>
+  );
+};
+
 /* ── Autopilot-style list row ── */
 const TraderRow = ({ t, onSelect, subscribed }) => {
   const canSee = t.portfolioValue <= MY_CAPITAL || subscribed || t.unlocked;
@@ -411,13 +549,29 @@ const TraderRow = ({ t, onSelect, subscribed }) => {
 };
 
 /* ── Autopilot-style push-nav detail screen ── */
-const TraderDetailScreen = ({ trader, show, onBack, subscribed, onFollow, onSubscribeClick }) => {
+const TraderDetailScreen = ({ trader, show, onBack, subscribed, onFollow, onSubscribeClick, traders }) => {
   const canSee = trader ? (trader.portfolioValue <= MY_CAPITAL || subscribed || trader.unlocked) : false;
   const pnl = trader?.pnls?.long;
-  const DEMO_HOLDINGS = [
-    ['RELIANCE','₹1,42,318','31%'],['INFY','₹88,402','19%'],
-    ['HDFCBANK','₹62,950','14%'],['BAJFINANCE','₹39,210','9%'],
-  ];
+  const chartData = trader ? (TRADER_CHARTS[trader.id] || TRADER_CHARTS[1]) : [];
+  const [selectedStock, setSelectedStock] = useState(null);
+  const [showStock, setShowStock] = useState(false);
+  const openStock = (ticker) => {
+    setSelectedStock(ticker);
+    requestAnimationFrame(() => setShowStock(true));
+  };
+  const closeStock = () => {
+    setShowStock(false);
+    setTimeout(() => setSelectedStock(null), 380);
+  };
+
+  const DEMO_HOLDINGS = trader
+    ? trader.tickers.slice(0,4).map((tk, i) => {
+        const vals = ['₹1,42,318','₹88,402','₹62,950','₹39,210'];
+        const pcts = ['31%','19%','14%','9%'];
+        return [tk.tk, vals[i] || '₹41,200', pcts[i] || '8%'];
+      })
+    : [];
+
   return (
     <div className={`detail-scr${show ? ' show' : ''}`}>
       {trader && <>
@@ -454,16 +608,28 @@ const TraderDetailScreen = ({ trader, show, onBack, subscribed, onFollow, onSubs
             <div className="dsg-cell"><div className="dsg-l">Capital</div><div className="dsg-v">{canSee ? trader.capital : <span className="score-blur">₹0.0Cr</span>}</div></div>
           </div>
 
-          <div className="detail-sec-hd">Current Holdings</div>
+          {/* Portfolio performance chart */}
+          <div className="detail-sec-hd" style={{paddingBottom:0}}>Portfolio Performance · 12M</div>
+          <div className="detail-mini-chart">
+            {canSee
+              ? <MiniChart data={chartData} up={pnl?.up}/>
+              : <div className="detail-chart-locked">
+                  <span className="detail-pro-tag" style={{display:'inline-block',background:'var(--g4)',color:'var(--g1)'}}>Subscribe to view</span>
+                </div>
+            }
+          </div>
+
+          <div className="detail-sec-hd">Current Holdings <span style={{fontFamily:'var(--dm)',fontSize:10,color:'var(--g2)',fontWeight:400,letterSpacing:0,textTransform:'none'}}>  tap to explore</span></div>
           <div className="detail-holdings">
             {DEMO_HOLDINGS.map(([tk,v,pct]) => (
-              <div className="dh-row" key={tk}>
+              <div className={`dh-row${canSee?' dh-row-tap':''}`} key={tk} onClick={() => { if(canSee){ hap.tap(); openStock(tk); } }}>
                 <div className="dh-tk">{canSee ? tk : <span className="score-blur">{tk}</span>}</div>
                 <div className="dh-pct">{canSee ? pct : '•%'}</div>
                 <div className="dh-val">{canSee ? v : <span className="score-blur">{v}</span>}</div>
+                {canSee && <span className="dh-chev">›</span>}
               </div>
             ))}
-            {trader.hidden > 0 && <div className="dh-more">+{trader.hidden} more · {canSee ? 'tap to view' : 'unlock to see all'}</div>}
+            {trader.hidden > 0 && <div className="dh-more">+{trader.hidden} more · {canSee ? 'tap any row to explore' : 'unlock to see all'}</div>}
           </div>
 
           <div className="detail-sec-hd">If you had followed</div>
@@ -497,6 +663,9 @@ const TraderDetailScreen = ({ trader, show, onBack, subscribed, onFollow, onSubs
                 </button>
           }
         </div>
+
+        {/* Stock detail push-over */}
+        <StockDetailScreen ticker={selectedStock} traders={traders||[]} show={showStock} onBack={closeStock} subscribed={subscribed}/>
       </>}
     </div>
   );
@@ -1433,7 +1602,7 @@ const App = () => {
       <IntelligenceScreen screenClass={screenClass(3)} onUnlock={()=>openUnlock(null)} toast={showToast} subscribed={subscribed} />
       <BottomNav active={screen} onChange={navigate} />
       <UnlockModal open={modalOpen} trader={modalTrader} onClose={()=>setModalOpen(false)} toast={showToast} onSubscribe={()=>setSubscribed(true)} subscribed={subscribed} />
-      <TraderDetailScreen trader={detailTraderLive} show={showDetail} onBack={closeDetail} subscribed={subscribed} onFollow={followTrader} onSubscribeClick={() => { setModalTrader(detailTraderLive); setModalOpen(true); }} />
+      <TraderDetailScreen trader={detailTraderLive} show={showDetail} onBack={closeDetail} subscribed={subscribed} onFollow={followTrader} onSubscribeClick={() => { setModalTrader(detailTraderLive); setModalOpen(true); }} traders={traders}/>
       <div className={`toast ${toastMsg?'show':''}`}>{toastMsg || ''}</div>
       </>}
     </div>

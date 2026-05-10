@@ -3215,3 +3215,49 @@ body{
   border:1.5px solid var(--g3);
 }
 .detail-cta-sub{font-size:14px;}
+
+/* ── trader detail: mini chart ── */
+.detail-mini-chart{
+  border-bottom:1px solid var(--g3);
+  overflow:hidden;
+}
+.detail-chart-locked{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:22px 24px;
+  min-height:80px;
+  background:var(--g5);
+}
+
+/* ── holdings row tap variant ── */
+.dh-row-tap{cursor:pointer;transition:background 140ms ease;}
+.dh-row-tap:active{background:var(--g5);}
+.dh-chev{
+  font-family:var(--mono);
+  font-size:16px;
+  color:var(--g2);
+  font-weight:300;
+  flex-shrink:0;
+}
+
+/* ── TradingView chart wrapper ── */
+.tv-chart-wrap{
+  flex-shrink:0;
+  background:white;
+  border-bottom:1px solid var(--g3);
+  overflow:hidden;
+}
+
+/* ── stock detail: trader positions list ── */
+.stock-trader-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:14px 24px;
+  border-bottom:1px solid var(--g4);
+  cursor:pointer;
+  transition:background 140ms ease;
+}
+.stock-trader-row:active{background:var(--g5);}
+.stock-trader-row:last-child{border-bottom:none;}
